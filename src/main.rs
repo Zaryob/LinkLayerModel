@@ -1,3 +1,5 @@
 fn main() {
-    println!("Merhaba, dünya!");
+    let a=0;
+
+    println!("Merhaba, dünya! %d", a);
 }
