@@ -1,6 +1,11 @@
+use confy;
+use serde_derive::{Serialize, Deserialize};
+
 use rand::{thread_rng, Rng};
 use rand_distr::{Normal, Distribution};
+use std::path::{Path};
 
+#[derive(Default, Serialize, Deserialize)]
 struct InputVariables {
     n: f64,
     sigma: f64,
@@ -340,10 +345,28 @@ fn Q(z: f64) -> f64 {
     }
 }
 
-fn main() {
-    // input parameters use in_var
+fn get_input() -> Result<InputVariables, confy::ConfyError> {
+    let _cfg: Result<InputVariables, confy::ConfyError> = confy::load_path("topology.conf");
+    return _cfg;
+}
 
-    let mut in_var = InputVariables::new();
+fn main() {
+    if !Path::new("topology.conf").exists(){
+        println!("Config not present in work place.");
+        std::process::exit(1);
+    }
+    let mut in_var: InputVariables;
+    // input parameters use in_var
+    if let Ok(i_c) = get_input() {
+        in_var=i_c;
+
+        // ... use sk ...
+    } else {
+        println!("Couldn't get config.");
+        std::process::exit(1);
+        // ... sk is not available, may be should
+        // we warn the user, ask for an alternative ... 
+    }
     // parse input file
     //read_file("inputFile.m", &mut in_var);
     // output parameters use out_var
