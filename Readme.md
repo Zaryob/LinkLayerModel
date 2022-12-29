@@ -1,9 +1,13 @@
-# Awesome project 
+# LinkLayerModel
 
-this is a test project.
+It is a Rust rewritten version of the code of the article that Marco Zuniga and Bhaskar Krishnamachari shared tool called "[Link Layer Models for Wireless Sensor Networks](http://anrg.usc.edu/www/download_files/LinkModellingTutorial.pdf)".
 
-This project uses python language.
+Usage 
+-----
 
-this project uses google-test framework for tests.
+In directory, customize the topology.conf file for you. If `topology=4`, enter your nodes in the "topologyFile". Then do 
 
-this project uses numpy for math calculations.
+```
+bash
+cargo run
+```
