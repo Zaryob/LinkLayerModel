@@ -270,13 +270,20 @@ fn obtain_rssi(in_var: &InputVariables, out_var: &mut OutputVariables) -> bool {
             out_var.gen[j as usize][i as usize] = out_var.output_power[j as usize] - avg_decay;
         }
     }
+    true
+}
+
+fn obtain_pr(in_var: &InputVariables, out_var: &mut OutputVariables)->bool{
+    let normal = rand_distr::Normal::new(0.0, 1.0).unwrap();
 
     for i in 0..in_var.num_nodes {
         for j in 0..in_var.num_nodes {
+            let dist = (out_var.node_pos_x[j as usize].powi(2) - out_var.node_pos_y[j as usize].powi(2)).sqrt(); 
+            // mean decay dependent on distance
             let dec = in_var.pld0
                 + 10.0
                     * in_var.n
-                    * ((out_var.node_pos_x[j as usize] / in_var.d0).ln() / 10.0f64.ln())
+                    * ((dist / in_var.d0).ln() / 10.0f64.ln())
                 + normal.sample(&mut rand::thread_rng()) * in_var.sigma;
             out_var.pr[i as usize][j as usize] = -dec;
         }
@@ -484,6 +491,13 @@ fn main() {
     } else {
         std::process::exit(1);
     }
+    // based on prob. of error, obtain packet reception rate for all the links
+    print!("{} Received Power ...\t\t", "->".yellow());
+    if obtain_pr(&in_var, &mut out_var) {
+        println!("{}", "done".green().bold());
+    } else {
+        std::process::exit(1);
+    }
     // based on rssi, obtain prob. of error for all the links
     print!("{} Probability of Error ...\t", "->".yellow());
     if obtain_prob_error(&in_var, &mut out_var) {
@@ -498,6 +512,7 @@ fn main() {
     } else {
         std::process::exit(1);
     }
+
     // provide Matrix result
     print!("{} Printing Output File ...\t", "->".yellow());
     if let Ok(_temp) = print_file("outputFile", &in_var, &out_var) {
