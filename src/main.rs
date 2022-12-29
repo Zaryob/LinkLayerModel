@@ -40,6 +40,7 @@ struct OutputVariables {
     node_pos_y: Vec<f64>,   // Y coordinate
     output_power: Vec<f64>, // output power
     noise_floor: Vec<f64>,  // noise floor
+    rssi: Vec<Vec<f64>>,    // noise floor
     gen: Vec<Vec<f64>>,     // general double dimensional array for rssi, Pe and prr
     pr: Vec<Vec<f64>>,      // general double dimensional array for rssi, Pe and prr
 }
@@ -51,6 +52,7 @@ impl OutputVariables {
             node_pos_y: vec![0.0; num_nodes],
             output_power: vec![0.0; num_nodes],
             noise_floor: vec![0.0; num_nodes],
+            rssi: vec![vec![0.0; num_nodes]; num_nodes],
             gen: vec![vec![0.0; num_nodes]; num_nodes],
             pr: vec![vec![0.0; num_nodes]; num_nodes],
         }
@@ -268,8 +270,12 @@ fn obtain_rssi(in_var: &InputVariables, out_var: &mut OutputVariables) -> bool {
             //		 to hardware imperfections and not for assymetric paths
             out_var.gen[i as usize][j as usize] = out_var.output_power[i as usize] - avg_decay;
             out_var.gen[j as usize][i as usize] = out_var.output_power[j as usize] - avg_decay;
+            out_var.rssi[i as usize][j as usize] = out_var.output_power[i as usize] - avg_decay;
+            out_var.rssi[j as usize][i as usize] = out_var.output_power[j as usize] - avg_decay;
         }
     }
+
+
     true
 }
 
@@ -435,6 +441,14 @@ fn print_file(
     for i in 0..in_var.num_nodes {
         for j in 0..in_var.num_nodes {
             write!(f, "{:.2}  ", out_var.pr[i as usize][j as usize])?;
+        }
+        write!(f, "\n")?;
+    }
+    write!(f, "];\n\n")?;
+    write!(f, "RSSI_MATRIX = [ \n")?;
+    for i in 0..in_var.num_nodes {
+        for j in 0..in_var.num_nodes {
+            write!(f, "{:.2}  ", out_var.rssi[i as usize][j as usize])?;
         }
         write!(f, "\n")?;
     }
