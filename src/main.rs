@@ -1,14 +1,13 @@
+use colored::Colorize;
 use confy;
-use serde_derive::{Deserialize, Serialize};
-
 use rand;
 use rand_distr::Distribution;
-use std::path::Path;
-
+use serde_derive::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::io::{BufRead, BufReader};
+use std::path::Path;
 use std::str::FromStr;
 
 #[derive(Default, Serialize, Deserialize)]
@@ -75,9 +74,9 @@ fn read_topology_file(
             && !line.starts_with(']')
         {
             let mut tokens = line.split_ascii_whitespace();
-            let node = usize::from_str(tokens.next().ok_or("Error: Invalid node number")?)?;
-            let x = f64::from_str(tokens.next().ok_or("Error: Invalid x coordinate")?)?;
-            let y = f64::from_str(tokens.next().ok_or("Error: Invalid y coordinate")?)?;
+            let node = usize::from_str(tokens.next().ok_or(format!("{}: Invalid node number", "Error".red()))?)?;
+            let x = f64::from_str(tokens.next().ok_or(format!("{}: Invalid x coordinate", "Error".red()))?)?;
+            let y = f64::from_str(tokens.next().ok_or(format!("{}: Invalid y coordinate", "Error".red()))?)?;
             out_var.node_pos_x[node] = x;
             out_var.node_pos_y[node] = y;
             counter += 1;
@@ -99,12 +98,12 @@ fn obtain_topology(in_var: &InputVariables, out_var: &mut OutputVariables) -> bo
     match in_var.top {
         1 => {
             if in_var.grid < in_var.d0 {
-                println!("Error: value of GRID_UNIT must be greater than D0");
+                println!("{}: value of GRID_UNIT must be greater than D0",  "Error".red());
                 return false;
             }
             let sqrt_num_nodes = (in_var.num_nodes as f64).sqrt().floor() as i32;
             if sqrt_num_nodes as f64 != (in_var.num_nodes as f64).sqrt() {
-                println!("Error: on GRID topology, NUMBER_OF_NODES should be the square of a natural number");
+                println!("{}: on GRID topology, NUMBER_OF_NODES should be the square of a natural number", "Error".red());
                 return false;
             }
             for i in 0..in_var.num_nodes {
@@ -114,7 +113,7 @@ fn obtain_topology(in_var: &InputVariables, out_var: &mut OutputVariables) -> bo
         }
         2 => {
             if in_var.xterr < 0.0 || in_var.yterr < 0.0 {
-                println!("Error: values of TERRAIN_DIMENSIONS must be positive");
+                println!("{}: values of TERRAIN_DIMENSIONS must be positive", "Error".red());
                 return false;
             }
             let cell_length = (in_var.area / in_var.num_nodes as f64).sqrt();
@@ -122,7 +121,7 @@ fn obtain_topology(in_var: &InputVariables, out_var: &mut OutputVariables) -> bo
             let cell_length = in_var.xterr as f64 / nodes_x as f64;
             if cell_length < in_var.d0 as f64 * 1.4 {
                 println!(
-                    "Error: on UNIFORM topology, density is too high, increase physical terrain"
+                    "{}: on UNIFORM topology, density is too high, increase physical terrain", "Error".red()
                 );
                 return false;
             }
@@ -160,13 +159,13 @@ fn obtain_topology(in_var: &InputVariables, out_var: &mut OutputVariables) -> bo
         }
         3 => {
             if in_var.xterr < 0.0 || in_var.xterr < 0.0 {
-                println!("Error: values of TERRAIN_DIMENSIONS must be positive");
+                println!("{}: values of TERRAIN_DIMENSIONS must be positive", "Error".red());
                 std::process::exit(1);
             }
             let cell_length = (in_var.area as f64 / in_var.num_nodes as f64).sqrt();
             if cell_length < in_var.d0 * 1.4 {
                 println!(
-                    "Error: on RANDOM topology, density is too high, increase physical terrain"
+                    "{}: on RANDOM topology, density is too high, increase physical terrain", "Error".red()
                 );
                 std::process::exit(1);
             }
@@ -210,7 +209,7 @@ fn obtain_topology(in_var: &InputVariables, out_var: &mut OutputVariables) -> bo
             }
         }
         _ => {
-            println!("Error: topology is not correct, please check TOPOLOGY in the input file");
+            println!("{}: topology is not correct, please check TOPOLOGY in the input file", "Error".red());
             std::process::exit(1);
         }
     }
@@ -225,7 +224,7 @@ fn correct_topology(in_var: &InputVariables, out_var: &OutputVariables) -> bool 
             let dist = (x_dist * x_dist + y_dist * y_dist).sqrt();
             if dist < in_var.d0 {
                 println!(
-                    "Error: file {} contains inter_node distances less than one.",
+                    "{}: file {} contains inter_node distances less than one.", "Error".red(),
                     in_var.top_file
                 );
                 std::process::exit(1);
@@ -322,7 +321,7 @@ fn obtain_prr(in_var: &InputVariables, out_var: &mut OutputVariables) -> bool {
                             .powf(((in_var.fra - in_var.pre) * 3) as f64);
                     }
                     _ => {
-                        println!("Error: encoding is not correct, please check ENCODING in the input file");
+                        println!("{}: encoding is not correct, please check ENCODING in the input file", "Error".red());
                         std::process::exit(1);
                     }
                 }
@@ -372,7 +371,7 @@ fn obtain_prob_error(in_var: &InputVariables, out_var: &mut OutputVariables) -> 
                         out_var.gen[i as usize][j as usize] = 0.5 * snr.exp() * -1.0;
                     }
                     _ => {
-                        println!("Error: modulation is not correct, please check MODULATION in the input file");
+                        println!("{}: modulation is not correct, please check MODULATION in the input file", "Error".red());
                         std::process::exit(1);
                     }
                 }
@@ -396,7 +395,7 @@ fn q(z: f64) -> f64 {
         (a1 * t + a2 * t.powi(2) + a3 * t.powi(3) + a4 * t.powi(4) + a5 * t.powi(5))
             * (-z.powi(2) / 2.0).exp()
     } else {
-        println!("Error in Q function: argument Z must be greater equal than 0");
+        println!("{} in {} function: argument Z must be greater equal than 0", "Error".red(), "Q".blue());
         std::process::exit(1);
     }
 }
@@ -444,7 +443,7 @@ fn get_input() -> Result<InputVariables, confy::ConfyError> {
 
 fn main() {
     if !Path::new("topology.conf").exists() {
-        println!("Config not present in work place.");
+        println!("{}: Config not present in work place.", "Error".red());
         std::process::exit(1);
     }
 
@@ -457,7 +456,7 @@ fn main() {
     } else {
         // ... config is not available, may be should
         // we warn the user, ask for an alternative ...
-        println!("Couldn't get config.");
+        println!("{}: Couldn't get config.", "Error".red());
         std::process::exit(1);
     }
     // parse input file
@@ -465,46 +464,45 @@ fn main() {
     // output parameters use out_var
     let mut out_var = OutputVariables::new(in_var.num_nodes.try_into().unwrap());
     // create topology
-    println!("Topology for {} nodes ...\t\t\t", in_var.num_nodes);
+    print!("{} Topology for {} nodes ...\t", "->".yellow(), in_var.num_nodes);
     if obtain_topology(&in_var, &mut out_var) {
-        println!("done");
+        println!("{}", "done".green().bold());
     } else {
         std::process::exit(1);
     }
     // obtain output power and noise floor
-    print!("Radio Pt and Pn ...\t\t");
+    print!("{} Radio Pt and Pn ...\t\t", "->".yellow());
     if obtain_radio_pt_pn(&in_var, &mut out_var) {
-        println!("done");
+        println!("{}", "done".green().bold());
     } else {
         std::process::exit(1);
     }
     // based on distance, obtain rssi for all the links
-    print!("Received Signal Strength ...\t");
+    print!("{} Received Signal Strength ...\t", "->".yellow());
     if obtain_rssi(&in_var, &mut out_var) {
-        println!("done");
+        println!("{}", "done".green().bold());
     } else {
         std::process::exit(1);
     }
     // based on rssi, obtain prob. of error for all the links
-    print!("Probability of Error ...\t");
+    print!("{} Probability of Error ...\t", "->".yellow());
     if obtain_prob_error(&in_var, &mut out_var) {
-        println!("done");
+        println!("{}", "done".green().bold());
     } else {
         std::process::exit(1);
     }
     // based on prob. of error, obtain packet reception rate for all the links
-    print!("Packet Reception Rate ...\t");
+    print!("{} Packet Reception Rate ...\t", "->".yellow());
     if obtain_prr(&in_var, &mut out_var) {
-        println!("done");
+        println!("{}", "done".green().bold());
     } else {
         std::process::exit(1);
     }
     // provide Matrix result
-    print!("Printing Output File ...\t");
+    print!("{} Printing Output File ...\t", "->".yellow());
     if let Ok(_temp) = print_file("outputFile", &in_var, &out_var) {
-        println!("done");
+        println!("{}", "done".green().bold());
     } else {
         std::process::exit(1);
     }
-    println!("done");
 }
