@@ -291,9 +291,10 @@ fn obtain_rssi(in_var: &InputVariables, out_var: &mut OutputVariables) -> bool {
     }
     for i in 0..in_var.num_nodes {
         for j in 0..in_var.num_nodes {
+
             let dec = in_var.pld0
-                + 10.0 * in_var.n * out_var.node_pos_x[j as usize].log2()
-                    / std::f64::consts::LOG10_2
+                + 10.0 * in_var.n * ((out_var.node_pos_x[j as usize]
+                    / in_var.d0).ln() / 10.0f64.ln())
                 + normal.sample(&mut rand::thread_rng()) * in_var.sigma;
             out_var.pr[i as usize][j as usize] = -dec;
         }
