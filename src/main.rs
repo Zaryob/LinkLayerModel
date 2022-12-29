@@ -1,11 +1,10 @@
 use confy;
 use serde_derive::{Deserialize, Serialize};
 
-use rand::{thread_rng, Rng};
-use rand_distr::{Distribution, Normal};
+use rand;
+use rand_distr::Distribution;
 use std::path::Path;
 
-use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
@@ -35,34 +34,6 @@ struct InputVariables {
     s12: f64,
     s21: f64,
     s22: f64,
-}
-
-impl InputVariables {
-    fn new() -> InputVariables {
-        InputVariables {
-            n: 0.0,
-            sigma: 0.0,
-            pld0: 0.0,
-            d0: 0.0,
-            mod_: 0,
-            enc: 0,
-            pout: 0.0,
-            pn: 0.0,
-            pre: 0,
-            fra: 0,
-            num_nodes: 0,
-            top: 0,
-            grid: 0.0,
-            xterr: 0.0,
-            yterr: 0.0,
-            top_file: "".to_string(),
-            area: 0.0,
-            s11: 0.0,
-            s12: 0.0,
-            s21: 0.0,
-            s22: 0.0,
-        }
-    }
 }
 
 struct OutputVariables {
@@ -124,11 +95,7 @@ fn read_topology_file(
 }
 
 fn obtain_topology(in_var: &InputVariables, out_var: &mut OutputVariables) -> bool {
-    let mut rand = rand::thread_rng();
     let normal = rand_distr::Normal::new(0.0, 1.0).unwrap();
-    let mut wrong_placement = true;
-    let i = 0;
-    let j = 0;
     match in_var.top {
         1 => {
             if in_var.grid < in_var.d0 {
@@ -150,8 +117,8 @@ fn obtain_topology(in_var: &InputVariables, out_var: &mut OutputVariables) -> bo
                 println!("Error: values of TERRAIN_DIMENSIONS must be positive");
                 return false;
             }
-            let cell_length = ((in_var.area / in_var.num_nodes as f64) as f64).sqrt();
-            let nodes_x = (in_var.xterr as f64 / cell_length).ceil() as i32;
+            let cell_length = (in_var.area / in_var.num_nodes as f64).sqrt();
+            let nodes_x = (in_var.xterr as f64 / cell_length).ceil().floor() as i32;
             let cell_length = in_var.xterr as f64 / nodes_x as f64;
             if cell_length < in_var.d0 as f64 * 1.4 {
                 println!(
@@ -160,11 +127,13 @@ fn obtain_topology(in_var: &InputVariables, out_var: &mut OutputVariables) -> bo
                 return false;
             }
             for i in 0..in_var.num_nodes {
-                out_var.node_pos_x[i as usize] = (i % nodes_x) as f64 * cell_length
+                out_var.node_pos_x[i as usize] = (i as f64 % nodes_x as f64) * cell_length
                     + normal.sample(&mut rand::thread_rng()) * cell_length;
-                out_var.node_pos_y[i as usize] = (i / nodes_x) as f64 * cell_length
+                out_var.node_pos_y[i as usize] = (i as f64 / nodes_x as f64) * cell_length
                     + normal.sample(&mut rand::thread_rng()) * cell_length;
+                let mut wrong_placement = true;
                 while wrong_placement {
+                    let j = 0;
                     for j in 0..i {
                         let x_dist =
                             out_var.node_pos_x[i as usize] - out_var.node_pos_x[j as usize];
@@ -173,10 +142,12 @@ fn obtain_topology(in_var: &InputVariables, out_var: &mut OutputVariables) -> bo
                         // distance between a given pair of nodes
                         let dist = ((x_dist * x_dist) + (y_dist * y_dist)).sqrt();
                         if dist < in_var.d0 {
-                            out_var.node_pos_x[i as usize] = (i % nodes_x) as f64 * cell_length
-                                + normal.sample(&mut rand::thread_rng()) * cell_length;
-                            out_var.node_pos_y[i as usize] = (i / nodes_x) as f64 * cell_length
-                                + normal.sample(&mut rand::thread_rng()) * cell_length;
+                            out_var.node_pos_x[i as usize] = ((i as f64 % nodes_x as f64)
+                                + normal.sample(&mut rand::thread_rng()))
+                                * cell_length;
+                            out_var.node_pos_y[i as usize] = ((i as f64 / nodes_x as f64)
+                                + normal.sample(&mut rand::thread_rng()))
+                                * cell_length;
                             wrong_placement = true;
                             break;
                         }
@@ -192,7 +163,7 @@ fn obtain_topology(in_var: &InputVariables, out_var: &mut OutputVariables) -> bo
                 println!("Error: values of TERRAIN_DIMENSIONS must be positive");
                 std::process::exit(1);
             }
-            let cell_length = (in_var.area / in_var.num_nodes as f64).sqrt();
+            let cell_length = (in_var.area as f64 / in_var.num_nodes as f64).sqrt();
             if cell_length < in_var.d0 * 1.4 {
                 println!(
                     "Error: on RANDOM topology, density is too high, increase physical terrain"
@@ -201,12 +172,13 @@ fn obtain_topology(in_var: &InputVariables, out_var: &mut OutputVariables) -> bo
             }
             for i in 0..in_var.num_nodes {
                 let mut wrong_placement = true;
+                out_var.node_pos_x[i as usize] =
+                    normal.sample(&mut rand::thread_rng()) * in_var.xterr;
+                out_var.node_pos_y[i as usize] =
+                    normal.sample(&mut rand::thread_rng()) * in_var.yterr;
                 while wrong_placement {
-                    out_var.node_pos_x[i as usize] =
-                        normal.sample(&mut rand::thread_rng()) * in_var.xterr;
-                    out_var.node_pos_y[i as usize] =
-                        normal.sample(&mut rand::thread_rng()) * in_var.yterr;
-                    wrong_placement = false;
+                    let j = 0;
+
                     for j in 0..i {
                         let x_dist =
                             out_var.node_pos_x[i as usize] - out_var.node_pos_x[j as usize];
@@ -214,9 +186,16 @@ fn obtain_topology(in_var: &InputVariables, out_var: &mut OutputVariables) -> bo
                             out_var.node_pos_y[i as usize] - out_var.node_pos_y[j as usize];
                         let dist = (x_dist * x_dist + y_dist * y_dist).sqrt();
                         if dist < in_var.d0 {
+                            out_var.node_pos_x[i as usize] =
+                                normal.sample(&mut rand::thread_rng()) * in_var.xterr;
+                            out_var.node_pos_y[i as usize] =
+                                normal.sample(&mut rand::thread_rng()) * in_var.yterr;
                             wrong_placement = true;
                             break;
                         }
+                    }
+                    if i == j {
+                        wrong_placement = false;
                     }
                 }
             }
@@ -224,8 +203,11 @@ fn obtain_topology(in_var: &InputVariables, out_var: &mut OutputVariables) -> bo
         4 => {
             // create topology
             // readTopologyFile(in_var.topFile, );
-            read_topology_file(&in_var.top_file, in_var, out_var);
-            correct_topology(in_var, out_var);
+            if let Ok(_temp) = read_topology_file(&in_var.top_file, in_var, out_var) {
+                correct_topology(in_var, out_var);
+            } else {
+                std::process::exit(1);
+            }
         }
         _ => {
             println!("Error: topology is not correct, please check TOPOLOGY in the input file");
@@ -258,7 +240,7 @@ fn obtain_radio_pt_pn(in_var: &InputVariables, out_var: &mut OutputVariables) ->
 
     let t11 = in_var.s11.sqrt();
     let t12 = in_var.s12 / t11;
-    let t22 = (in_var.s11 * in_var.s22 - in_var.s12.powi(2)) / in_var.s11;
+    let t22 = (in_var.s11 * in_var.s22 - in_var.s12.powi(2)).sqrt() / in_var.s11;
     for i in 0..in_var.num_nodes {
         let rn1 = normal.sample(&mut rand::thread_rng());
         let rn2 = normal.sample(&mut rand::thread_rng());
@@ -278,23 +260,24 @@ fn obtain_rssi(in_var: &InputVariables, out_var: &mut OutputVariables) -> bool {
             // distance between a given pair of nodes
             let dist = (x_dist * x_dist + y_dist * y_dist).sqrt();
             // mean decay dependent on distance
-            let avg_decay = -in_var.pld0
-                - 10.0 * in_var.n * (dist / in_var.d0).log2() / std::f64::consts::LOG10_2
-                + normal.sample(&mut rand::thread_rng()) * in_var.sigma;
+            let avg_decay = in_var.pld0
+                + 10.0 * in_var.n * ((dist / in_var.d0).ln() / 10.0f64.ln())
+                - normal.sample(&mut rand::thread_rng()) * in_var.sigma;
             // assymetric links are given by running two different
             // R.V.s for each unidirectional link.
             // NOTE: this approach is not accurate, assymetry is due mainly to
             //		 to hardware imperfections and not for assymetric paths
-            out_var.gen[i as usize][j as usize] = out_var.output_power[i as usize] + avg_decay;
-            out_var.gen[j as usize][i as usize] = out_var.output_power[j as usize] + avg_decay;
+            out_var.gen[i as usize][j as usize] = out_var.output_power[i as usize] - avg_decay;
+            out_var.gen[j as usize][i as usize] = out_var.output_power[j as usize] - avg_decay;
         }
     }
+
     for i in 0..in_var.num_nodes {
         for j in 0..in_var.num_nodes {
-
             let dec = in_var.pld0
-                + 10.0 * in_var.n * ((out_var.node_pos_x[j as usize]
-                    / in_var.d0).ln() / 10.0f64.ln())
+                + 10.0
+                    * in_var.n
+                    * ((out_var.node_pos_x[j as usize] / in_var.d0).ln() / 10.0f64.ln())
                 + normal.sample(&mut rand::thread_rng()) * in_var.sigma;
             out_var.pr[i as usize][j as usize] = -dec;
         }
@@ -308,13 +291,14 @@ fn obtain_prr(in_var: &InputVariables, out_var: &mut OutputVariables) -> bool {
             if i == j {
                 out_var.gen[i as usize][j as usize] = 1.0;
             } else {
-                let pre_seq = (1.0 - out_var.gen[i as usize][j as usize]).powi(8 * in_var.pre);
+                let pre_seq =
+                    (1.0 - out_var.gen[i as usize][j as usize]).powf(8.0 * in_var.pre as f64);
                 match in_var.enc {
                     1 => {
                         // NRZ
                         out_var.gen[i as usize][j as usize] = pre_seq
                             * (1.0 - out_var.gen[i as usize][j as usize])
-                                .powi(8 * (in_var.fra - in_var.pre));
+                                .powf(8.0 * (in_var.fra - in_var.pre) as f64);
                     }
                     2 => {
                         // 4B5B
@@ -326,16 +310,16 @@ fn obtain_prr(in_var: &InputVariables, out_var: &mut OutputVariables) -> bool {
                         // Manchester
                         out_var.gen[i as usize][j as usize] = pre_seq
                             * (1.0 - out_var.gen[i as usize][j as usize])
-                                .powi(8 * (in_var.fra - in_var.pre) * 2);
+                                .powf(8.0 * ((in_var.fra - in_var.pre) * 2) as f64);
                     }
                     4 => {
                         // SECDED
                         out_var.gen[i as usize][j as usize] = pre_seq
-                            * ((1.0 - out_var.gen[i as usize][j as usize]).powi(8)
+                            * ((1.0 - out_var.gen[i as usize][j as usize]).powf(8.0)
                                 + 8.0
                                     * out_var.gen[i as usize][j as usize]
-                                    * (1.0 - out_var.gen[i as usize][j as usize]).powi(7))
-                            .powi((in_var.fra - in_var.pre) * 3);
+                                    * (1.0 - out_var.gen[i as usize][j as usize]).powf(7.0))
+                            .powf(((in_var.fra - in_var.pre) * 3) as f64);
                     }
                     _ => {
                         println!("Error: encoding is not correct, please check ENCODING in the input file");
@@ -365,11 +349,11 @@ fn obtain_prob_error(in_var: &InputVariables, out_var: &mut OutputVariables) -> 
                     1 => {
                         // NCASK
                         out_var.gen[i as usize][j as usize] =
-                            0.5 * (snr.exp() * -0.5 + Q(snr.sqrt()));
+                            0.5 * (snr.exp() * -0.5 + q(snr.sqrt()));
                     }
                     2 => {
                         // ASK
-                        out_var.gen[i as usize][j as usize] = Q((snr / 2.0).sqrt());
+                        out_var.gen[i as usize][j as usize] = q((snr / 2.0).sqrt());
                     }
                     3 => {
                         // NCFSK
@@ -377,11 +361,11 @@ fn obtain_prob_error(in_var: &InputVariables, out_var: &mut OutputVariables) -> 
                     }
                     4 => {
                         // FSK
-                        out_var.gen[i as usize][j as usize] = Q(snr.sqrt());
+                        out_var.gen[i as usize][j as usize] = q(snr.sqrt());
                     }
                     5 => {
                         // BPSK
-                        out_var.gen[i as usize][j as usize] = Q((2.0 * snr).sqrt());
+                        out_var.gen[i as usize][j as usize] = q((2.0 * snr).sqrt());
                     }
                     6 => {
                         // DPSK
@@ -399,7 +383,7 @@ fn obtain_prob_error(in_var: &InputVariables, out_var: &mut OutputVariables) -> 
     true
 }
 
-fn Q(z: f64) -> f64 {
+fn q(z: f64) -> f64 {
     let a1 = 0.127414796;
     let a2 = -0.142248368;
     let a3 = 0.7107068705;
@@ -436,7 +420,7 @@ fn print_file(
     write!(f, "PRR_MATRIX = [ \n")?;
     for i in 0..in_var.num_nodes {
         for j in 0..in_var.num_nodes {
-            write!(f, "{}  ", out_var.gen[i as usize][j as usize])?;
+            write!(f, "{:.2}  ", out_var.gen[i as usize][j as usize])?;
         }
         write!(f, "\n")?;
     }
@@ -444,7 +428,7 @@ fn print_file(
     write!(f, "PR_MATRIX = [ \n")?;
     for i in 0..in_var.num_nodes {
         for j in 0..in_var.num_nodes {
-            write!(f, "{}  ", out_var.pr[i as usize][j as usize])?;
+            write!(f, "{:.2}  ", out_var.pr[i as usize][j as usize])?;
         }
         write!(f, "\n")?;
     }
@@ -464,7 +448,7 @@ fn main() {
         std::process::exit(1);
     }
 
-    let mut in_var: InputVariables;
+    let in_var: InputVariables;
     // input parameters use in_var
     if let Ok(i_c) = get_input() {
         // ... use config ...
@@ -517,7 +501,7 @@ fn main() {
     }
     // provide Matrix result
     print!("Printing Output File ...\t");
-    if let Ok(temp) = print_file("outputFile", &in_var, &out_var) {
+    if let Ok(_temp) = print_file("outputFile", &in_var, &out_var) {
         println!("done");
     } else {
         std::process::exit(1);
